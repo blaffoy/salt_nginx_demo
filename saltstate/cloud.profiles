@@ -1,0 +1,28 @@
+ubuntu_ec2_prod:
+  provider: tw_ec2_prod
+  image: ami-234ecc54
+  size: t2.micro
+  grains:
+    roles:
+      - appserver
+      - prodserver
+      - production
+
+ubuntu_ec2_lb:
+  provider: tw_ec2_loadbal
+  image: ami-234ecc54
+  size: t2.micro
+  grains:
+    roles:
+      - loadbalancer
+      - production
+
+ubuntu_ec2_test:
+  provider: tw_ec2_test
+  image: ami-234ecc54
+  size: t2.micro
+  grains:
+    roles:
+      - appserver
+      - testserver
+      - test

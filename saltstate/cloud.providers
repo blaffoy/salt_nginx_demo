@@ -1,0 +1,71 @@
+tw_ec2_prod:
+  minion:
+    master: {{grains.get('public_ip')}}
+
+  grains:
+    roles:
+      - webserver
+
+  ssh_interface: public_ips
+
+  id: {{pillar.get('aws_iam_id')}}
+  key: {{pillar.get('aws_iam_key')}}
+
+  private_key: /etc/salt/cloud.conf.d/{{pillar.get('aws_ssh_key_name')}}.pem
+  keyname: {{pillar.get('aws_ssh_key_name')}}
+  securitygroup: {{pillar.get('aws_prod_sec_group')}}
+
+  location: {{pillar.get('aws_region')}}
+  availability_zone: {{pillar.get('aws_availability_zone')}}
+
+  ssh_username: ubuntu
+
+  provider: ec2
+
+tw_ec2_loadbal:
+  minion:
+    master: {{grains.get('public_ip')}}
+
+  grains:
+    roles:
+      - webserver
+
+  ssh_interface: public_ips
+
+  id: {{pillar.get('aws_iam_id')}}
+  key: {{pillar.get('aws_iam_key')}}
+
+  private_key: /etc/salt/cloud.conf.d/{{pillar.get('aws_ssh_key_name')}}.pem
+  keyname: {{pillar.get('aws_ssh_key_name')}}
+  securitygroup: {{pillar.get('aws_prod_sec_group')}}
+
+  location: {{pillar.get('aws_region')}}
+  availability_zone: {{pillar.get('aws_availability_zone')}}
+
+  ssh_username: ubuntu
+
+  provider: ec2
+
+tw_ec2_test:
+  minion:
+    master: {{grains.get('public_ip')}}
+
+  grains:
+    roles:
+      - webserver
+
+  ssh_interface: public_ips
+
+  id: {{pillar.get('aws_iam_id')}}
+  key: {{pillar.get('aws_iam_key')}}
+
+  private_key: /etc/salt/cloud.conf.d/{{pillar.get('aws_ssh_key_name')}}.pem
+  keyname: {{pillar.get('aws_ssh_key_name')}}
+  securitygroup: {{pillar.get('aws_test_sec_group')}}
+
+  location: {{pillar.get('aws_region')}}
+  availability_zone: {{pillar.get('aws_availability_zone')}}
+
+  ssh_username: ubuntu
+
+  provider: ec2

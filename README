@@ -1,0 +1,113 @@
+Interview DevOps Assignment
+==============================
+
+
+Introduction
+------------
+
+
+I've aimed to perform this deployment using Saltstack on AWS EC2. The web application server is Tomcat7, with two production servers serving the webapp to an nginx load balancer. There is a single tomcat7 test instance.
+
+Using multiple production machines allows for redundancy and resilience to failure, as well as faster response times during high load. nginx will disperse incoming requests between the production servers in a simple round robin. There is significant scope to improve this arrangement, that I'll discuss further below.
+
+New production machines can be brought online easily by adding to the cloud configuration in saltstate/map.sls, and rerunning salt-cloud. This is fast and easy to do, though for a true high availability service, new machines should be brought online automatically during times of high load, and destroyed during quiet time to reduce costs.
+
+The test server has nearly identical configuration to the production machine. The only difference is that it belongs to a different security group to the production machines. For a real world system, the test machine ought to be inaccessible from outside the organizations network. In this configuration, only the load balancer should accept connections to the outside world, and only the production appservers should accept connections from the load balancer. I have implemented separate security groups for each, but I have largely left the configuration of each group the same. An important step before moving this system into production would be to tighten up such security holes.
+
+
+Setup
+-----
+
+
+I have tested this using:
+
+* AWS EC2 t2.micro instance running Ubuntu 14.04-amd64-server.
+* AWS ssh private key with access to the Ubuntu server
+* User with su privileges over ssh usiing this key (default user: ubuntu)
+* AWS access key/secret key pair.
+* Server member of a security group that will accept connections on port 22 (ssh) and 4505-4506 (salt)
+
+The configuration to reuse my setup and my AWS EC2 account is in the file pillar/keys.sls. If you would like to test this with a different AWS account, then the following should be replaced:
+
+* an AWS account
+* a private ssh key configured on EC2
+  - in pillar/keys.sls replace aws_ssh_key_name with the name of the key
+  - and replace aws_ssh_key_file with the value of the key. Note the two leading space indents should be preserved as the file is now
+* a Access ID/Secret Access Key pair from AWS associated with an IAM account with privileges to create and destroy EC2 images
+  - replace the values aws_iam_id and aws_iam_key in pillar/keys.sls accordingly
+
+IMPORTANT: The host machine where you run this configuration must be able to receive connections on port 22 (ssh) and 4505-4506 (salt).[0]
+
+[0] Leaving random ports open to the internet is not something I would do in production, but within the constraints of this assignment, I feel it is the simplest solution to get something running. For a production implementation, I would set up all EC2 instances within a VPC.
+
+
+Running
+-------
+
+
+Running this will depend on the key configuration above. For simplicity, you can use the keys that are loaded into the Salt Pillars. These have permission to create and destroy EC2 instances on my AWS account. I'll delete these keys in a couple of weeks.
+
+* unzip this file somewhere in your host machine
+* run the bootstrap script:
+  - sudo ./bootstrap.sh
+* this will take a few minutes to run, but once complete will give you URLs for the production and test apps:
+
+    Production service is available at http://54.154.33.113:8080/companyNews
+    Test service is available at http://54.171.154.234:8080/companyNews
+
+
+Result
+------
+
+
+This will install three Salt modules: salt-master, salt-minion and salt-cloud. The host machine will be configured as a master and a minion. salt-cloud will deploy some EC2 instances configured to run the webserver in production and test environments:
+
+    loadbalancer:
+      - loadbal
+    production:
+      - prod_1
+      - prod_2
+    test:
+      - test_1
+
+There was a slight issue in Tomcat, where the webapp had a hardcoded path of /home/russell/persistence/ included (presumably around the database backend logic). I have configured Salt to create this path and give ownership of it to Tomcat, just to allow the webapp to load correctly.
+
+
+Further Work
+------------
+
+
+I have limited time to devote to this assignment. There are numerous other things that I would do if I was putting this place in the real world (depending on the timeframe, customer needs, and expected load).
+
+This is a list of important work, arranged roughly in order of descending priority, before this could be considered a production ready system.
+
+* correctly configure security groups to limit what is exposed to the real world
+  - production webapp servers should be available to the load balancer, but not the outside network
+  - test webapp server should be available only from within the network
+  - only the load balancer should be available to the real world
+* consolidate database backend of multiple instances of the webapp
+  - as this version writes data to a flat file, this file is not reproduced between production instances
+  - better for all production instances to write to a commaon database backend
+  - a NoSQL database (e.g Mongo) would provide fast write times and easy replication of data across multiple servers aat the expense of possible inconsistencies in data for users
+* reconfigure the load balancer strategy
+  - right now, defaults to a simple round-robin
+  - analysis of real world network load would indicate whether or not this is appropriate
+  - a specific concern is that as every request would be dispatched immediately to a server, a single slow machine might slow down half the incoming requests. By limiting the queue length on each server, we could avoid this.
+  - nginx also supports dispatching by server queue length
+* automatically bring up new instances in times of heavy load
+  - might attach event hooks to queue length in load balancer, to create and destroy instances as necessary
+  - this allows us to manage times of high load without incurring continual costs of over-provisioning
+  - a more traditional RDBMS would likely offer too slow response times for our uses.
+* diversify this infrastructure to multiple EC2 regions
+  - gives us another layer of redundancy vs server centre failure
+  - reduces network transit time for international customers
+  - should be achievable with minimum reconfiguration of the file cloud.profiles
+* deploy the .war and .zip artifacts to and from an artifact server
+  - decouples the infrastructure code from the production code
+  - important step in a continuous deployment pipeline
+  - allows pushes of new versions of the webapp to be more easily automated from the build/release pipeline (Jenkins/Buildbot/etc)
+  - allows easier implementation of blue/green deployment
+* blue/green deployment strategy
+  - staged deployments of new versions of the webapp
+  - any errors in the new version can be isolated, do not effect all users
+  - rollbacks are more easily achieved
